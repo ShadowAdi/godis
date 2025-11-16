@@ -2,9 +2,8 @@ package main
 
 import (
 	"fmt"
-	"io"
+	"godis/internals/resp"
 	"net"
-	"os"
 )
 
 func main() {
@@ -25,15 +24,16 @@ func main() {
 	defer conn.Close()
 
 	for {
-		buff := make([]byte, 1024)
-		_, err := conn.Read(buff)
+		resp := resp.NewResp(conn)
+		value, err := resp.Read()
 		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			fmt.Println("error reading from client: ", err.Error())
-			os.Exit(1)
+			fmt.Println(err)
+			return
 		}
+
+		fmt.Println(value)
+
+		// ignore request and send back a PONG
 		conn.Write([]byte("+OK\r\n"))
 	}
 }
