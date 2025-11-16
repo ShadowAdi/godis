@@ -24,16 +24,18 @@ func main() {
 	defer conn.Close()
 
 	for {
-		resp := resp.NewResp(conn)
-		value, err := resp.Read()
+		decoder := resp.NewResp(conn)
+
+		value, err := decoder.Read()
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
 
-		fmt.Println(value)
+		fmt.Println("CLIENT SENT:", value)
 
-		// ignore request and send back a PONG
-		conn.Write([]byte("+OK\r\n"))
+		writer := resp.NewWriter(conn)
+
+		writer.Write(resp.Value{Typ: "string", Str: "OK"})
 	}
 }
