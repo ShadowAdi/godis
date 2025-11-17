@@ -28,7 +28,7 @@ func hset(args []resp.Value) resp.Value {
 	return resp.Value{Typ: "string", Str: "OK"}
 }
 
-func gset(args []resp.Value) resp.Value {
+func hget(args []resp.Value) resp.Value {
 	if len(args) != 2 {
 		return resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'hset' command"}
 	}
@@ -47,6 +47,34 @@ func gset(args []resp.Value) resp.Value {
 	return resp.Value{
 		Typ:  "bulk",
 		Bulk: value,
+	}
+
+}
+
+func hGetAll(args []resp.Value) resp.Value {
+	if len(args) != 1 {
+		return resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'hset' command"}
+	}
+
+	hash := args[0].Bulk
+
+	HSETsMS.RLock()
+	values, ok := HSETs[hash]
+	HSETsMS.RUnlock()
+
+	if !ok {
+		return resp.Value{Typ: "null"}
+	}
+
+	arr := []resp.Value{}
+	for k, v := range values {
+		arr = append(arr, resp.Value{Typ: "bulk", Bulk: k})
+		arr = append(arr, resp.Value{Typ: "bulk", Bulk: v})
+	}
+
+	return resp.Value{
+		Typ:   "array",
+		Array: arr,
 	}
 
 }
