@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"godis/helper"
 	"godis/internals/aof"
+	"godis/internals/client"
 	"godis/internals/handlers"
 	"godis/internals/resp"
 	"net"
@@ -50,54 +51,16 @@ func main() {
 
 	helper.LogInfo("Waiting for client connections...")
 
-	conn, err := l.Accept()
-	if err != nil {
-		helper.LogError(fmt.Sprintf("Failed to accept connection: %v", err))
-		return
-	}
-	defer conn.Close()
-
-	helper.LogConnection(fmt.Sprintf("New client connected: %s", conn.RemoteAddr().String()))
-
 	for {
-		decoder := resp.NewResp(conn)
-
-		value, err := decoder.Read()
+		conn, err := l.Accept()
 		if err != nil {
-			helper.LogError(fmt.Sprintf("Connection error: %v", err))
-			helper.LogConnection("Client disconnected")
-			return
-		}
-
-		if value.Typ != "array" {
-			helper.LogError("Invalid request: expected array")
+			helper.LogError(fmt.Sprintf("Failed to accept connection: %v", err))
 			continue
 		}
 
-		if len(value.Array) == 0 {
-			helper.LogError("Invalid request: array length = 0")
-			continue
-		}
+		helper.LogConnection(fmt.Sprintf("New client connected: %s", conn.RemoteAddr().String()))
 
-		command := strings.ToUpper(value.Array[0].Bulk)
-		args := value.Array[1:]
-
-		helper.LogCommand(command, len(args))
-
-		writer := resp.NewWriter(conn)
-
-		handler, ok := handlers.Handlers[command]
-		if !ok {
-			helper.LogError(fmt.Sprintf("Unknown command: %s", command))
-			writer.Write(resp.Value{Typ: "string", Str: ""})
-			continue
-		}
-
-		if command == "SET" || command == "HSET" {
-			aof.Write(value)
-		}
-
-		result := handler(args)
-		writer.Write(result)
+		// Handle each client in a separate goroutine
+		go client.HandleClient(conn, aof)
 	}
 }
