@@ -5,12 +5,8 @@ $4
 name
 $3
 adi
-*4
+*2
+$3
+SET
 $4
-HSET
-$5
-users
-$2
-u1
-$6
-akshay
+name
