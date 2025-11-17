@@ -7,6 +7,49 @@ import (
 
 var SETs = map[string]string{}
 var SETsMS = sync.RWMutex{}
+var HSETs = map[string]map[string]string{}
+var HSETsMS = sync.RWMutex{}
+
+func hset(args []resp.Value) resp.Value {
+	if len(args) != 3 {
+		return resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'hset' command"}
+	}
+
+	hash := args[0].Bulk
+	key := args[1].Bulk
+	value := args[2].Bulk
+
+	HSETsMS.Lock()
+	if _, ok := HSETs[hash]; !ok {
+		HSETs[hash] = map[string]string{}
+	}
+	HSETs[hash][key] = value
+	HSETsMS.Unlock()
+	return resp.Value{Typ: "string", Str: "OK"}
+}
+
+func gset(args []resp.Value) resp.Value {
+	if len(args) != 2 {
+		return resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'hset' command"}
+	}
+
+	hash := args[0].Bulk
+	key := args[1].Bulk
+
+	HSETsMS.RLock()
+	value, ok := HSETs[hash][key]
+	HSETsMS.RUnlock()
+
+	if !ok {
+		return resp.Value{Typ: "null"}
+	}
+
+	return resp.Value{
+		Typ:  "bulk",
+		Bulk: value,
+	}
+
+}
 
 func ping(args []resp.Value) resp.Value {
 	return resp.Value{
