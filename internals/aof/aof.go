@@ -3,6 +3,7 @@ package aof
 import (
 	"bufio"
 	"godis/internals/resp"
+	"io"
 	"os"
 	"sync"
 	"time"
@@ -23,6 +24,7 @@ func NewAoF(path string) (*Aof, error) {
 	aof := &Aof{
 		file: f,
 		rd:   bufio.NewReader(f),
+		mu:   &sync.Mutex{},
 	}
 
 	go func() {
@@ -50,5 +52,24 @@ func (aof *Aof) Write(value resp.Value) error {
 		return err
 	}
 
+	return nil
+}
+
+func (aof *Aof) Read(callback func(value resp.Value)) error {
+	aof.mu.Lock()
+	defer aof.mu.Unlock()
+	resp := resp.NewResp(aof.file)
+	for {
+		value, err := resp.Read()
+		if err == nil {
+			callback(value)
+		}
+
+		if err == io.EOF {
+			break
+		}
+
+		return err
+	}
 	return nil
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"godis/internals/aof"
 	"godis/internals/handlers"
 	"godis/internals/resp"
 	"net"
@@ -16,6 +17,13 @@ func main() {
 		fmt.Println(err)
 		return
 	}
+
+	aof, err := aof.NewAoF("database.aof")
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer aof.Close()
 
 	conn, err := l.Accept()
 	if err != nil {
@@ -54,6 +62,10 @@ func main() {
 			fmt.Println("Invalid command: ", command)
 			writer.Write(resp.Value{Typ: "string", Str: ""})
 			continue
+		}
+
+		if command == "SET" || command == "HSET" {
+			aof.Write(value)
 		}
 
 		result := handler(args)
