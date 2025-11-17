@@ -116,7 +116,10 @@ func GET(args []resp.Value) resp.Value {
 }
 
 var Handlers = map[string]func([]resp.Value) resp.Value{
-	"PING": ping,
-	"SET":  SET,
-	"GET":  GET,
+	"PING":    ping,
+	"SET":     SET,
+	"GET":     GET,
+	"HSET":    hset,
+	"HGET":    hget,
+	"HGETALL": hGetAll,
 }
