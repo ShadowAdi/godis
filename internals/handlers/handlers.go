@@ -30,6 +30,22 @@ func SET(args []resp.Value) resp.Value {
 	}
 }
 
+func GET(args []resp.Value) resp.Value {
+	if len(args) != 1 {
+		return resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'set' command"}
+	}
+	key := args[0].Bulk
+	SETsMS.RLock()
+	value, ok := SETs[key]
+	SETsMS.RUnlock()
+	if !ok {
+		return resp.Value{Typ: "null"}
+	}
+	return resp.Value{Typ: "bulk", Bulk: value}
+}
+
 var Handlers = map[string]func([]resp.Value) resp.Value{
 	"PING": ping,
+	"SET":  SET,
+	"GET":  GET,
 }
