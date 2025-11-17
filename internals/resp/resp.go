@@ -3,6 +3,7 @@ package resp
 import (
 	"bufio"
 	"fmt"
+	"godis/helper"
 	"io"
 	"strconv"
 )
@@ -40,6 +41,7 @@ func (w *Writer) Write(v Value) error {
 	var bytes = v.Marshal()
 	_, err := w.writer.Write(bytes)
 	if err != nil {
+		helper.LogError(fmt.Sprintf("Failed to write response: %v", err))
 		return err
 	}
 	return nil
@@ -53,6 +55,9 @@ func (r *Resp) readLine() (line []byte, n int, err error) {
 	for {
 		b, err := r.reader.ReadByte()
 		if err != nil {
+			if err != io.EOF {
+				helper.LogError(fmt.Sprintf("Error reading byte: %v", err))
+			}
 			return nil, 0, err
 		}
 		n += 1
@@ -71,6 +76,7 @@ func (r *Resp) readInteger() (x int, n int, err error) {
 	}
 	i64, err := strconv.ParseInt(string(line), 10, 64)
 	if err != nil {
+		helper.LogError(fmt.Sprintf("Failed to parse integer: %v", err))
 		return 0, n, err
 	}
 	return int(i64), n, nil
@@ -80,6 +86,9 @@ func (r *Resp) Read() (Value, error) {
 	_type, err := r.reader.ReadByte()
 
 	if err != nil {
+		if err != io.EOF {
+			helper.LogError(fmt.Sprintf("Error reading type byte: %v", err))
+		}
 		return Value{}, err
 	}
 
@@ -89,8 +98,8 @@ func (r *Resp) Read() (Value, error) {
 	case BULK:
 		return r.readBulk()
 	default:
-		fmt.Printf("Unknown type: %v", string(_type))
-		return Value{}, nil
+		helper.LogError(fmt.Sprintf("Unknown RESP type: %v", string(_type)))
+		return Value{}, fmt.Errorf("unknown RESP type: %v", string(_type))
 	}
 }
 
@@ -101,6 +110,7 @@ func (r *Resp) readArray() (Value, error) {
 	// read length of array
 	len, _, err := r.readInteger()
 	if err != nil {
+		helper.LogError(fmt.Sprintf("Failed to read array length: %v", err))
 		return v, err
 	}
 
@@ -109,6 +119,7 @@ func (r *Resp) readArray() (Value, error) {
 	for i := 0; i < len; i++ {
 		val, err := r.Read()
 		if err != nil {
+			helper.LogError(fmt.Sprintf("Failed to read array element %d: %v", i, err))
 			return v, err
 		}
 
@@ -126,17 +137,26 @@ func (r *Resp) readBulk() (Value, error) {
 
 	len, _, err := r.readInteger()
 	if err != nil {
+		helper.LogError(fmt.Sprintf("Failed to read bulk string length: %v", err))
 		return v, err
 	}
 
 	bulk := make([]byte, len)
 
-	r.reader.Read(bulk)
+	_, err = r.reader.Read(bulk)
+	if err != nil {
+		helper.LogError(fmt.Sprintf("Failed to read bulk string data: %v", err))
+		return v, err
+	}
 
 	v.Bulk = string(bulk)
 
 	// Read the trailing CRLF
-	r.readLine()
+	_, _, err = r.readLine()
+	if err != nil {
+		helper.LogError(fmt.Sprintf("Failed to read trailing CRLF: %v", err))
+		return v, err
+	}
 
 	return v, nil
 }

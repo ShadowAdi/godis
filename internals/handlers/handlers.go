@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"fmt"
+	"godis/helper"
 	"godis/internals/resp"
 	"sync"
 )
@@ -12,6 +14,7 @@ var HSETsMS = sync.RWMutex{}
 
 func hset(args []resp.Value) resp.Value {
 	if len(args) != 3 {
+		helper.LogError("HSET: wrong number of arguments")
 		return resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'hset' command"}
 	}
 
@@ -22,15 +25,18 @@ func hset(args []resp.Value) resp.Value {
 	HSETsMS.Lock()
 	if _, ok := HSETs[hash]; !ok {
 		HSETs[hash] = map[string]string{}
+		helper.LogInfo(fmt.Sprintf("Created new hash: %s", hash))
 	}
 	HSETs[hash][key] = value
 	HSETsMS.Unlock()
+	helper.LogInfo(fmt.Sprintf("HSET: hash=%s, key=%s", hash, key))
 	return resp.Value{Typ: "string", Str: "OK"}
 }
 
 func hget(args []resp.Value) resp.Value {
 	if len(args) != 2 {
-		return resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'hset' command"}
+		helper.LogError("HGET: wrong number of arguments")
+		return resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'hget' command"}
 	}
 
 	hash := args[0].Bulk
@@ -41,9 +47,11 @@ func hget(args []resp.Value) resp.Value {
 	HSETsMS.RUnlock()
 
 	if !ok {
+		helper.LogInfo(fmt.Sprintf("HGET: key not found - hash=%s, key=%s", hash, key))
 		return resp.Value{Typ: "null"}
 	}
 
+	helper.LogInfo(fmt.Sprintf("HGET: hash=%s, key=%s", hash, key))
 	return resp.Value{
 		Typ:  "bulk",
 		Bulk: value,
@@ -53,7 +61,8 @@ func hget(args []resp.Value) resp.Value {
 
 func hGetAll(args []resp.Value) resp.Value {
 	if len(args) != 1 {
-		return resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'hset' command"}
+		helper.LogError("HGETALL: wrong number of arguments")
+		return resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'hgetall' command"}
 	}
 
 	hash := args[0].Bulk
@@ -63,6 +72,7 @@ func hGetAll(args []resp.Value) resp.Value {
 	HSETsMS.RUnlock()
 
 	if !ok {
+		helper.LogInfo(fmt.Sprintf("HGETALL: hash not found - hash=%s", hash))
 		return resp.Value{Typ: "null"}
 	}
 
@@ -72,6 +82,7 @@ func hGetAll(args []resp.Value) resp.Value {
 		arr = append(arr, resp.Value{Typ: "bulk", Bulk: v})
 	}
 
+	helper.LogInfo(fmt.Sprintf("HGETALL: hash=%s, fields=%d", hash, len(values)))
 	return resp.Value{
 		Typ:   "array",
 		Array: arr,
@@ -88,6 +99,7 @@ func ping(args []resp.Value) resp.Value {
 
 func SET(args []resp.Value) resp.Value {
 	if len(args) != 2 {
+		helper.LogError("SET: wrong number of arguments")
 		return resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'set' command"}
 	}
 	key := args[0].Bulk
@@ -95,6 +107,7 @@ func SET(args []resp.Value) resp.Value {
 	SETsMS.Lock()
 	SETs[key] = value
 	SETsMS.Unlock()
+	helper.LogInfo(fmt.Sprintf("SET: key=%s", key))
 	return resp.Value{
 		Typ: "string",
 		Str: "OK",
@@ -103,15 +116,18 @@ func SET(args []resp.Value) resp.Value {
 
 func GET(args []resp.Value) resp.Value {
 	if len(args) != 1 {
-		return resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'set' command"}
+		helper.LogError("GET: wrong number of arguments")
+		return resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'get' command"}
 	}
 	key := args[0].Bulk
 	SETsMS.RLock()
 	value, ok := SETs[key]
 	SETsMS.RUnlock()
 	if !ok {
+		helper.LogInfo(fmt.Sprintf("GET: key not found - key=%s", key))
 		return resp.Value{Typ: "null"}
 	}
+	helper.LogInfo(fmt.Sprintf("GET: key=%s", key))
 	return resp.Value{Typ: "bulk", Bulk: value}
 }
 
