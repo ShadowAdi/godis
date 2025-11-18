@@ -241,7 +241,7 @@ func WILDCARD(args []resp.Value) resp.Value {
 	if len(args) != 0 {
 		return resp.Value{
 			Typ: "error",
-			Str: "ERR rong number of arguments for WILDCARD command",
+			Str: "ERR wrong number of arguments for WILDCARD command",
 		}
 	}
 
@@ -249,28 +249,26 @@ func WILDCARD(args []resp.Value) resp.Value {
 
 	SETsMS.RLock()
 	for key, value := range SETs {
-		// Skip expired keys
 		if !Expired(key) {
 			entry := fmt.Sprintf("SET %s %s", key, value)
-			all = append(all, resp.Value{Typ: "string", Bulk: entry})
+			all = append(all, resp.Value{Typ: "bulk", Bulk: entry})
 		}
 	}
-	SETsMS.Unlock()
+	SETsMS.RUnlock()
 
-	HSETsMS.Lock()
+	HSETsMS.RLock()
 	for hash, fields := range HSETs {
 		for field, val := range fields {
 			entry := fmt.Sprintf("HSET %s %s %s", hash, field, val)
-			all = append(all, resp.Value{Typ: "string", Bulk: entry})
+			all = append(all, resp.Value{Typ: "bulk", Bulk: entry})
 		}
 	}
-	HSETsMS.Unlock()
+	HSETsMS.RUnlock()
 
 	return resp.Value{
 		Typ:   "array",
 		Array: all,
 	}
-
 }
 
 func EXPIRE(args []resp.Value) resp.Value {
