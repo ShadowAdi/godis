@@ -4,13 +4,17 @@ import (
 	"fmt"
 	"godis/helper"
 	"godis/internals/resp"
+	"strconv"
 	"sync"
+	"time"
 )
 
 var SETs = map[string]string{}
 var SETsMS = sync.RWMutex{}
 var HSETs = map[string]map[string]string{}
 var HSETsMS = sync.RWMutex{}
+var TTLs = map[string]int64{}
+var TTLsMS = sync.RWMutex{}
 
 func HSET(args []resp.Value) resp.Value {
 	if len(args) != 3 {
@@ -213,6 +217,31 @@ func WILDCARD(args []resp.Value) resp.Value {
 		Typ:   "array",
 		Array: all,
 	}
+
+}
+
+func EXPIRE(args []resp.Value) resp.Value {
+	if len(args) != 2 {
+		return resp.Value{
+			Typ: "error",
+			Str: "ERR rong number of arguments for EXPIRE command",
+		}
+	}
+	key := args[0].Bulk
+	seconds, _ := strconv.Atoi(args[1].Bulk)
+
+	SETsMS.Lock()
+	_, ok := SETs[key]
+	SETsMS.Unlock()
+
+	if !ok {
+		return resp.Value{Typ: "integer", Num: 0}
+	}
+
+	TTLsMS.Lock()
+	TTLs[key] = time.Now().Unix() + int64(seconds)
+	TTLsMS.Unlock()
+	return resp.Value{Typ: "integer", Num: 1}
 
 }
 
