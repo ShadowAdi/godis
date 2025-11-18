@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"godis/helper"
 	"godis/internals/aof"
+	"godis/internals/cleaners"
 	"godis/internals/client"
 	"godis/internals/handlers"
 	"godis/internals/resp"
@@ -17,6 +18,10 @@ func main() {
 	helper.PrintServerInfo(":6380")
 
 	helper.LogInfo("Starting GODIS server...")
+
+	// Start the expiry cleaner in background
+	cleaners.StartExpiryCleaner()
+	helper.LogInfo("Expiry cleaner started")
 
 	l, err := net.Listen("tcp", ":6380")
 	if err != nil {
