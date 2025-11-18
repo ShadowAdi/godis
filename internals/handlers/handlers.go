@@ -99,19 +99,27 @@ func ping(args []resp.Value) resp.Value {
 
 func SET(args []resp.Value) resp.Value {
 	if len(args) != 2 {
-		helper.LogError("SET: wrong number of arguments")
 		return resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'set' command"}
 	}
+
 	key := args[0].Bulk
 	value := args[1].Bulk
+
+	// Check if key already exists
+	SETsMS.RLock()
+	_, exists := SETs[key]
+	SETsMS.RUnlock()
+
+	if exists {
+		return resp.Value{Typ: "error", Str: "ERR key already exists"}
+	}
+
+	// Insert new key
 	SETsMS.Lock()
 	SETs[key] = value
 	SETsMS.Unlock()
-	helper.LogInfo(fmt.Sprintf("SET: key=%s", key))
-	return resp.Value{
-		Typ: "string",
-		Str: "OK",
-	}
+
+	return resp.Value{Typ: "string", Str: "OK"}
 }
 
 func GET(args []resp.Value) resp.Value {
@@ -131,7 +139,24 @@ func GET(args []resp.Value) resp.Value {
 	return resp.Value{Typ: "bulk", Bulk: value}
 }
 
-func EXISTS(args []resp.Value) bool {
+func IsExists(args []resp.Value) resp.Value {
+	if len(args) != 1 {
+		helper.LogError("EXISTS: wrong number of arguments")
+		return resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'exists' command"}
+	}
+	key := args[0].Bulk
+	SETsMS.RLock()
+	_, ok := SETs[key]
+	SETsMS.RUnlock()
+	if !ok {
+		helper.LogInfo(fmt.Sprintf("EXISTS: key not found - key=%s", key))
+		return resp.Value{Typ: "integer", Num: 0}
+	}
+	helper.LogInfo(fmt.Sprintf("EXISTS: key=%s", key))
+	return resp.Value{Typ: "integer", Num: 1}
+}
+
+func DELETE(args []resp.Value) bool {
 	if len(args) != 1 {
 		helper.LogError("EXISTS: wrong number of arguments")
 		return false
@@ -154,5 +179,5 @@ var Handlers = map[string]func([]resp.Value) resp.Value{
 	"HSET":    hset,
 	"HGET":    hget,
 	"HGETALL": hGetAll,
-	"EXISTS":EXISTS()
+	"EXISTS":  IsExists,
 }
