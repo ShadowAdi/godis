@@ -19,7 +19,7 @@ var TTLsMS = sync.RWMutex{}
 func Expired(key string) bool {
 	TTLsMS.RLock()
 	ts, ok := TTLs[key]
-	TTLsMS.Unlock()
+	TTLsMS.RUnlock()
 
 	if !ok {
 		return false
