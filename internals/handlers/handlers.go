@@ -16,6 +16,29 @@ var HSETsMS = sync.RWMutex{}
 var TTLs = map[string]int64{}
 var TTLsMS = sync.RWMutex{}
 
+func Expired(key string) bool {
+	TTLsMS.RLock()
+	ts, ok := TTLs[key]
+	TTLsMS.Unlock()
+
+	if !ok {
+		return false
+	}
+
+	if ts <= time.Now().Unix() {
+		TTLsMS.Lock()
+		delete(TTLs, key)
+		TTLsMS.Unlock()
+
+		SETsMS.Lock()
+		delete(SETs, key)
+		SETsMS.Unlock()
+		return true
+	}
+
+	return false
+}
+
 func HSET(args []resp.Value) resp.Value {
 	if len(args) != 3 {
 		return resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'hset' command"}
@@ -116,7 +139,10 @@ func SET(args []resp.Value) resp.Value {
 	key := args[0].Bulk
 	value := args[1].Bulk
 
-	// Check if key already exists
+	// 1. Expiry check - this will clean up the key if expired
+	Expired(key)
+
+	// 2. Check if key exists
 	SETsMS.RLock()
 	_, exists := SETs[key]
 	SETsMS.RUnlock()
@@ -125,7 +151,7 @@ func SET(args []resp.Value) resp.Value {
 		return resp.Value{Typ: "error", Str: "ERR key already exists"}
 	}
 
-	// Insert new key
+	// 3. Insert new key
 	SETsMS.Lock()
 	SETs[key] = value
 	SETsMS.Unlock()
@@ -139,6 +165,13 @@ func GET(args []resp.Value) resp.Value {
 		return resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'get' command"}
 	}
 	key := args[0].Bulk
+
+	// Check if key has expired
+	if Expired(key) {
+		helper.LogInfo(fmt.Sprintf("GET: key expired - key=%s", key))
+		return resp.Value{Typ: "null"}
+	}
+
 	SETsMS.RLock()
 	value, ok := SETs[key]
 	SETsMS.RUnlock()
@@ -156,6 +189,13 @@ func IsExists(args []resp.Value) resp.Value {
 		return resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'exists' command"}
 	}
 	key := args[0].Bulk
+
+	// Check if key has expired
+	if Expired(key) {
+		helper.LogInfo(fmt.Sprintf("EXISTS: key expired - key=%s", key))
+		return resp.Value{Typ: "integer", Num: 0}
+	}
+
 	SETsMS.RLock()
 	_, ok := SETs[key]
 	SETsMS.RUnlock()
@@ -174,6 +214,11 @@ func DELETE(args []resp.Value) resp.Value {
 
 	key := args[0].Bulk
 
+	// Check if key has expired (this will clean it up)
+	if Expired(key) {
+		return resp.Value{Typ: "integer", Num: 0}
+	}
+
 	SETsMS.Lock()
 	defer SETsMS.Unlock()
 
@@ -183,6 +228,11 @@ func DELETE(args []resp.Value) resp.Value {
 	}
 
 	delete(SETs, key)
+
+	// Also clean up TTL if it exists
+	TTLsMS.Lock()
+	delete(TTLs, key)
+	TTLsMS.Unlock()
 
 	return resp.Value{Typ: "integer", Num: 1} // Redis returns 1 when deletion succeeds
 }
@@ -199,8 +249,11 @@ func WILDCARD(args []resp.Value) resp.Value {
 
 	SETsMS.RLock()
 	for key, value := range SETs {
-		entry := fmt.Sprintf("SET %s %s", key, value)
-		all = append(all, resp.Value{Typ: "string", Bulk: entry})
+		// Skip expired keys
+		if !Expired(key) {
+			entry := fmt.Sprintf("SET %s %s", key, value)
+			all = append(all, resp.Value{Typ: "string", Bulk: entry})
+		}
 	}
 	SETsMS.Unlock()
 
@@ -255,4 +308,5 @@ var Handlers = map[string]func([]resp.Value) resp.Value{
 	"EXISTS":   IsExists,
 	"DELETE":   DELETE,
 	"WILDCARD": WILDCARD,
+	"EXPIRE":   EXPIRE,
 }
