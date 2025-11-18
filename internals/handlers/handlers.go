@@ -163,20 +163,24 @@ func IsExists(args []resp.Value) resp.Value {
 	return resp.Value{Typ: "integer", Num: 1}
 }
 
-func DELETE(args []resp.Value) bool {
+func DELETE(args []resp.Value) resp.Value {
 	if len(args) != 1 {
-		helper.LogError("EXISTS: wrong number of arguments")
-		return false
+		return resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'del' command"}
 	}
+
 	key := args[0].Bulk
-	SETsMS.RLock()
+
+	SETsMS.Lock()
+	defer SETsMS.Unlock()
+
 	_, ok := SETs[key]
 	if !ok {
-		helper.LogInfo(fmt.Sprintf("GET: key not found - key=%s", key))
-		return false
+		return resp.Value{Typ: "integer", Num: 0} // Redis returns 0 when key does not exist
 	}
-	helper.LogInfo(fmt.Sprintf("GET: key=%s", key))
-	return true
+
+	delete(SETs, key)
+
+	return resp.Value{Typ: "integer", Num: 1} // Redis returns 1 when deletion succeeds
 }
 
 var Handlers = map[string]func([]resp.Value) resp.Value{
@@ -187,4 +191,5 @@ var Handlers = map[string]func([]resp.Value) resp.Value{
 	"HGET":    hget,
 	"HGETALL": hGetAll,
 	"EXISTS":  IsExists,
+	"DELETE":  DELETE,
 }
