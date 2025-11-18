@@ -183,13 +183,47 @@ func DELETE(args []resp.Value) resp.Value {
 	return resp.Value{Typ: "integer", Num: 1} // Redis returns 1 when deletion succeeds
 }
 
+func WILDCARD(args []resp.Value) resp.Value {
+	if len(args) != 0 {
+		return resp.Value{
+			Typ: "error",
+			Str: "ERR rong number of arguments for WILDCARD command",
+		}
+	}
+
+	var all []resp.Value
+
+	SETsMS.RLock()
+	for key, value := range SETs {
+		entry := fmt.Sprintf("SET %s %s", key, value)
+		all = append(all, resp.Value{Typ: "string", Bulk: entry})
+	}
+	SETsMS.Unlock()
+
+	HSETsMS.Lock()
+	for hash, fields := range HSETs {
+		for field, val := range fields {
+			entry := fmt.Sprintf("HSET %s %s %s", hash, field, val)
+			all = append(all, resp.Value{Typ: "string", Bulk: entry})
+		}
+	}
+	HSETsMS.Unlock()
+
+	return resp.Value{
+		Typ:   "array",
+		Array: all,
+	}
+
+}
+
 var Handlers = map[string]func([]resp.Value) resp.Value{
-	"PING":    ping,
-	"SET":     SET,
-	"GET":     GET,
-	"HSET":    HSET,
-	"HGET":    hget,
-	"HGETALL": hGetAll,
-	"EXISTS":  IsExists,
-	"DELETE":  DELETE,
+	"PING":     ping,
+	"SET":      SET,
+	"GET":      GET,
+	"HSET":     HSET,
+	"HGET":     hget,
+	"HGETALL":  hGetAll,
+	"EXISTS":   IsExists,
+	"DELETE":   DELETE,
+	"WILDCARD": WILDCARD,
 }
