@@ -131,6 +131,22 @@ func GET(args []resp.Value) resp.Value {
 	return resp.Value{Typ: "bulk", Bulk: value}
 }
 
+func EXISTS(args []resp.Value) bool {
+	if len(args) != 1 {
+		helper.LogError("EXISTS: wrong number of arguments")
+		return false
+	}
+	key := args[0].Bulk
+	SETsMS.RLock()
+	_, ok := SETs[key]
+	if !ok {
+		helper.LogInfo(fmt.Sprintf("GET: key not found - key=%s", key))
+		return false
+	}
+	helper.LogInfo(fmt.Sprintf("GET: key=%s", key))
+	return true
+}
+
 var Handlers = map[string]func([]resp.Value) resp.Value{
 	"PING":    ping,
 	"SET":     SET,
@@ -138,4 +154,5 @@ var Handlers = map[string]func([]resp.Value) resp.Value{
 	"HSET":    hset,
 	"HGET":    hget,
 	"HGETALL": hGetAll,
+	"EXISTS":EXISTS()
 }
