@@ -12,9 +12,8 @@ var SETsMS = sync.RWMutex{}
 var HSETs = map[string]map[string]string{}
 var HSETsMS = sync.RWMutex{}
 
-func hset(args []resp.Value) resp.Value {
+func HSET(args []resp.Value) resp.Value {
 	if len(args) != 3 {
-		helper.LogError("HSET: wrong number of arguments")
 		return resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'hset' command"}
 	}
 
@@ -23,13 +22,21 @@ func hset(args []resp.Value) resp.Value {
 	value := args[2].Bulk
 
 	HSETsMS.Lock()
+	defer HSETsMS.Unlock()
+
+	// If hash doesn't exist, create it
 	if _, ok := HSETs[hash]; !ok {
 		HSETs[hash] = map[string]string{}
-		helper.LogInfo(fmt.Sprintf("Created new hash: %s", hash))
 	}
+
+	// Check if field already exists
+	if _, exists := HSETs[hash][key]; exists {
+		return resp.Value{Typ: "error", Str: "ERR field already exists"}
+	}
+
+	// Insert new field
 	HSETs[hash][key] = value
-	HSETsMS.Unlock()
-	helper.LogInfo(fmt.Sprintf("HSET: hash=%s, key=%s", hash, key))
+
 	return resp.Value{Typ: "string", Str: "OK"}
 }
 
@@ -176,7 +183,7 @@ var Handlers = map[string]func([]resp.Value) resp.Value{
 	"PING":    ping,
 	"SET":     SET,
 	"GET":     GET,
-	"HSET":    hset,
+	"HSET":    HSET,
 	"HGET":    hget,
 	"HGETALL": hGetAll,
 	"EXISTS":  IsExists,
